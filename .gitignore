@@ -1,0 +1,3 @@
+/graph-server/target/
+graph-server/nb-configuration.xml
+graph-server/dependency-reduced-pom.xml
