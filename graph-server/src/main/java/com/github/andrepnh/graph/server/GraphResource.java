@@ -29,7 +29,7 @@ public class GraphResource {
     
     private final Random random = new Random();
 
-    @Path("/size")
+    @Path("/edges-quanty")
     @GET
     public int getSize() {
         return App.INSTANCE.getGraph().getAdjacencies().size();
@@ -42,15 +42,14 @@ public class GraphResource {
         @Min(0) @QueryParam("offset") int offset, @Min(1) @QueryParam("limit") int limit) 
         throws InterruptedException {
         boolean fail = random.nextInt(100) < 25;
-        if (random.nextInt(100) < 25) {
+        if (fail) {
             throw new WebApplicationException(502);
         }
-        boolean wait = random.nextInt(100) < 25;
-        if (wait) {
-            TimeUnit.MILLISECONDS.sleep(random.nextInt(1000 - 200) + 200);
-        }
-        return App.INSTANCE.getGraph().getAdjacencies().subList(offset, offset + limit)
+        TimeUnit.MILLISECONDS.sleep(random.nextInt(300 - 200) + 200);
+        return App.INSTANCE.getGraph().getAdjacencies()
             .stream()
+            .skip(offset)
+            .limit(limit)
             .map(Adjancency::new)
             .collect(Collectors.toList());
     }

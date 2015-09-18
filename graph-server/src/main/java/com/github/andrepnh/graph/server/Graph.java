@@ -32,14 +32,14 @@ public class Graph {
         checkArgument(0 < desiredFillRate && desiredFillRate <= 100,
             "0 < fillRate <= 100, got %s",
             desiredFillRate);
-        final int lowerRate = (int) Math.floor(desiredFillRate * 0.75), 
+        final int lowerRate = Math.max(1, (int) Math.floor(desiredFillRate * 0.75)), 
             higherRate = (int) Math.ceil(desiredFillRate * 1.25);
         final Random random = new Random();
         final Builder builder = new Builder(vertices);                          
         IntStream.range(0, vertices)
             .parallel()
             .forEach(source -> {
-                double neighbours = getNeighbours(vertices, 
+                int neighbours = getNeighbours(vertices, 
                     () -> random.nextInt(higherRate - lowerRate) + lowerRate);
                 for (int i = 0; i < neighbours; i++) {
                     int destination = safeRandom(() -> random.nextInt(vertices), source);
@@ -59,7 +59,7 @@ public class Graph {
 
     private static int getNeighbours(int vertices, IntSupplier fillRateSupplier) {
         double fillRate = ((double) fillRateSupplier.getAsInt()) / 100;
-        return (int) (fillRate * (vertices - 1));
+        return (int) Math.ceil(fillRate * (vertices - 1));
     }
     
     private static int safeRandom(IntSupplier supplier, int exclusion) {

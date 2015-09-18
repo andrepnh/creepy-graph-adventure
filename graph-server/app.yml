@@ -1,9 +1,7 @@
 server:
   # Define o caminho base do jersey
   rootPath: /api/*
-
-logging:
-  level: INFO
-  appenders:
-    - type: console
-      logFormat: "%-5level | %C.%method:%L - %message%n"
+  requestLog:
+    appenders: []
+  minThreads: 32
+  maxThreads: 32
