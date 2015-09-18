@@ -1,0 +1,6 @@
+{
+	"batchSize": 1000,
+	"limit": 1000,
+	"ioThreadPoolMultiplier": 8,
+	"graphServerHost": "localhost:8080"
+}

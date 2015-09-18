@@ -1,3 +1,5 @@
 /graph-server/target/
 graph-server/nb-configuration.xml
 graph-server/dependency-reduced-pom.xml
+/java8/target/
+java8/nbactions.xml
