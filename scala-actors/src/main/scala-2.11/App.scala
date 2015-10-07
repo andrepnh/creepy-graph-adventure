@@ -17,14 +17,7 @@ object App {
         context.actorOf(Props[EdgesFetcher], name = "EdgesFetcher") ! c.host
       case q: Int =>
         println(q)
-        context.stop(self)
-        context.system.shutdown()
-      case x =>
-        println("unknown message 1 " + x)
-        context.system.shutdown()
     }
-
-    override def postStop = println("GraphAssembler - stopped")
 
   }
 
@@ -35,8 +28,6 @@ object App {
         val response = Http(req OK as.String)
         val quanty = response map { _.toInt }
         quanty pipeTo sender
-        context.stop(self)
-      case _ => println("unknown message 2")
     }
   }
 
