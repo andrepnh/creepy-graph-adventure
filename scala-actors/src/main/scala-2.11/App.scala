@@ -43,11 +43,8 @@ object App {
     }
 
     def collectEdges(edges: Array[Edge]): Receive = {
-      case adjacencies: Array[_] =>
-        adjacencies.head match {
-          case e: Edge =>
-            context.become(collectEdges(edges ++ adjacencies.asInstanceOf[Array[Edge]]))
-        }
+      case adjacencies: Array[Edge] =>
+        context.become(collectEdges(edges ++ adjacencies.asInstanceOf[Array[Edge]]))
       case _: BatchProcessingFinished =>
         println(edges.length)
     }
