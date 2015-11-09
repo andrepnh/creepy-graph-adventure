@@ -17,11 +17,6 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import org.javatuples.Triplet;
 
-/**
- *
- * @author André Pinheiro de Melo
- */
-
 @Path("/graph")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)

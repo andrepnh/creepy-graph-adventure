@@ -1,4 +1,6 @@
-import akka.pattern.pipe
+import java.net.ConnectException
+import java.util.concurrent.atomic.AtomicInteger
+
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -6,75 +8,107 @@ import dispatch._, Defaults._
 import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.actor.Actor
+import com.typesafe.config.ConfigFactory
 
 object App {
+
   def main(args: Array[String]): Unit = {
+    val actorSystemConf = ConfigFactory.parseString("""
+      akka {
+        stdout-loglevel = "OFF"
+        loglevel = "OFF"
+      }
+                                                    """)
     val mapper = new ObjectMapper()
     mapper.registerModule(DefaultScalaModule)
     val config = Config("localhost:8080", mapper, 1000)
-    val system = ActorSystem("MySystem")
-    val assembler = system.actorOf(Props(classOf[GraphAssembler], config), name = "GraphAssembler")
+    //val system = ActorSystem("MySystem")
+    val system = ActorSystem("MySystem", ConfigFactory.load(actorSystemConf))
+    val coordinator = system.actorOf(Props(classOf[AssemblingCoordinator], config), name = "Coordinator")
     Thread sleep 3000
-    assembler ! "stop"
+    coordinator ! config
   }
 
-  class GraphAssembler(config: Config) extends Actor {
-    context.actorOf(Props[EdgesFetcher], name = "EdgesFetcher") ! config.host
+  class AssemblingCoordinator(config: Config) extends Actor {
 
-    override def receive = {
-      case quantyEdges: Int =>
-        val batches = quantyEdges / config.batchSize + (if (quantyEdges % config.batchSize > 0) 1 else 0)
-        for (batch <- List.range(0, 1)) {
-          context.actorOf(Props[AdjacencyArrayFetcher], name = "AdjacencyArrayFetcher" + batch) ! (config, batch * config.batchSize)
-        }
-      case adjacencies: Either[Throwable, Array[Edge]] => adjacencies match {
-        case Left(ex) =>
-          ex.printStackTrace()
-        case Right(edges) =>
-          println("becoming")
-          context.become(receiveEdgeBatch(edges))
-      }
-      case f: akka.actor.Status.Failure => f.cause.printStackTrace()
-      case x => println(x.getClass)
+
+    def receive = {
+      case config: Config =>
+        val req = url(s"http://${config.host}/api/graph/edges-quanty")
+        val futureQuanty = Http(req OK as.String) map { _.toInt }
+        val quantyEdges = futureQuanty()
+        val batches = quantyEdges / config.batchSize + (math signum (quantyEdges % config.batchSize))
+        context.become(collectEdges(Array[Edge]()))
+        context.actorOf(Props[EdgesBathProcessor], name = "EdgesBathProcessor") ! (batches, config)
     }
 
-    def receiveEdgeBatch(edges: Array[Edge]): Receive = {
+    def collectEdges(edges: Array[Edge]): Receive = {
       case adjacencies: Array[_] =>
         adjacencies.head match {
           case e: Edge =>
-            println(edges.size)
-            context.become(receiveEdgeBatch(edges ++ adjacencies.asInstanceOf[Array[Edge]]))
+            context.become(collectEdges(edges ++ adjacencies.asInstanceOf[Array[Edge]]))
         }
-      case "stop" =>
-        println(edges.mkString(", "))
-        context.system.shutdown()
+      case _: BatchProcessingFinished =>
+        println(edges.length)
     }
 
   }
 
-  class EdgesFetcher extends Actor {
-    override def receive = {
-      case host: String =>
-        val req = url(s"http://$host/api/graph/edges-quanty")
-        val response = Http(req OK as.String)
-        val quanty = response map { _.toInt }
-        quanty pipeTo sender
+  class EdgesBathProcessor extends Actor {
+    import akka.actor.OneForOneStrategy
+    import akka.actor.SupervisorStrategy._
+
+    override val supervisorStrategy = OneForOneStrategy() {
+      case _: AdjacencyServerFailure => Restart
+      case _: Exception              => Escalate
+    }
+
+    def receive = {
+      case (batches: Int, config: Config) =>
+        context.become(receiveBatchResults(batches, 1))
+        for (batch <- List.range(0, batches)) {
+          val adjancencyFetcher = context.actorOf(Props[AdjacencyArrayFetcher], name = "AdjacencyArrayFetcher" + batch)
+          adjancencyFetcher ! (config, batch * config.batchSize)
+        }
+    }
+
+    def receiveBatchResults(totalBatches: Int, batchesAlreadyProcessed: Int): Receive = {
+      case edges: Array[Edge] =>
+        context.parent ! edges
+        if (batchesAlreadyProcessed == totalBatches)
+          context.parent ! BatchProcessingFinished()
+        else
+          context.become(receiveBatchResults(totalBatches, batchesAlreadyProcessed + 1))
     }
   }
 
   class AdjacencyArrayFetcher extends Actor {
-    override def receive = {
+    def receive = {
       case (config: Config, offset: Int) =>
         val req = url(s"http://${config.host}/api/graph?offset=$offset&limit=${config.batchSize}")
-        val response = Http(req OK as.String).either
-        val adjancencyArray: Future[Either[Throwable, List[Edge]]] = response map {
-          case Left(ex) => Left(ex)
-          case Right(json) => Right(config.mapper.readValue(json, new TypeReference[Array[Edge]]{}))
+        val response: Future[Either[Throwable, String]] = Http(req OK as.String).either
+        response() match {
+          case Left(StatusCode(502))     => throw AdjacencyServerFailure(offset)
+          case Left(_: ConnectException) => throw AdjacencyServerFailure(offset)
+          case Left(ex)                  => throw ex
+          case Right(json)               =>
+            context.parent ! config.mapper.readValue(json, new TypeReference[Array[Edge]] {})
         }
-        adjancencyArray pipeTo sender
+    }
+
+    override def preRestart(cause: Throwable, message: Option[Any]): Unit = {
+      cause match {
+        case AdjacencyServerFailure(_) =>
+          message match {
+            case Some(m) => self ! m
+          }
+      }
     }
   }
 
   case class Config(host: String, mapper: ObjectMapper, batchSize: Int)
   case class Edge(i: Int, j: Int, weight: Int)
+  case class AdjacencyServerFailure(offset: Int)
+    extends Exception(s"Temporary server failure fetching adjancencies after $offset")
+  case class BatchProcessingFinished()
 }
