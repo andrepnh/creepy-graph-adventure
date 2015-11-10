@@ -1,6 +1,4 @@
 import java.net.ConnectException
-import java.util.concurrent.atomic.AtomicInteger
-
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -13,6 +11,7 @@ import com.typesafe.config.ConfigFactory
 object App {
 
   def main(args: Array[String]): Unit = {
+    val foo = Stopwatch.start // Forcing initialization
     val actorSystemConf = ConfigFactory.parseString("""
       akka {
         stdout-loglevel = "OFF"
@@ -22,15 +21,12 @@ object App {
     val mapper = new ObjectMapper()
     mapper.registerModule(DefaultScalaModule)
     val config = Config("localhost:8080", mapper, 1000)
-    //val system = ActorSystem("MySystem")
     val system = ActorSystem("MySystem", ConfigFactory.load(actorSystemConf))
     val coordinator = system.actorOf(Props(classOf[AssemblingCoordinator], config), name = "Coordinator")
-    Thread sleep 3000
     coordinator ! config
   }
 
   class AssemblingCoordinator(config: Config) extends Actor {
-
 
     def receive = {
       case config: Config =>
@@ -38,15 +34,20 @@ object App {
         val futureQuanty = Http(req OK as.String) map { _.toInt }
         val quantyEdges = futureQuanty()
         val batches = quantyEdges / config.batchSize + (math signum (quantyEdges % config.batchSize))
-        context.become(collectEdges(Array[Edge]()))
+        context.become(collectEdges(Array[Edge](), Set[Int]()))
         context.actorOf(Props[EdgesBathProcessor], name = "EdgesBathProcessor") ! (batches, config)
     }
 
-    def collectEdges(edges: Array[Edge]): Receive = {
+    def collectEdges(edges: Array[Edge], vertices: Set[Int]): Receive = {
       case adjacencies: Array[Edge] =>
-        context.become(collectEdges(edges ++ adjacencies.asInstanceOf[Array[Edge]]))
+        context.become(collectEdges(
+          edges ++ adjacencies,
+          vertices ++ edges.flatMap(e => (e.i, e.j).productIterator map (_.asInstanceOf[Int]))))
       case _: BatchProcessingFinished =>
-        println(edges.length)
+        println(s"Vertices: ${vertices.size}")
+        println(s"Edges: ${edges.length}")
+        println(s"Milliseconds taken: ${Stopwatch elapsedTime}")
+        context.system.shutdown()
     }
 
   }
@@ -72,10 +73,11 @@ object App {
     def receiveBatchResults(totalBatches: Int, batchesAlreadyProcessed: Int): Receive = {
       case edges: Array[Edge] =>
         context.parent ! edges
-        if (batchesAlreadyProcessed == totalBatches)
+        if (batchesAlreadyProcessed == totalBatches) {
           context.parent ! BatchProcessingFinished()
-        else
+        } else {
           context.become(receiveBatchResults(totalBatches, batchesAlreadyProcessed + 1))
+        }
     }
   }
 
@@ -90,6 +92,7 @@ object App {
           case Left(ex)                  => throw ex
           case Right(json)               =>
             context.parent ! config.mapper.readValue(json, new TypeReference[Array[Edge]] {})
+            context.stop(self)
         }
     }
 
@@ -108,4 +111,12 @@ object App {
   case class AdjacencyServerFailure(offset: Int)
     extends Exception(s"Temporary server failure fetching adjancencies after $offset")
   case class BatchProcessingFinished()
+  case object Stopwatch {
+    val start: Long = System.nanoTime()
+
+    def elapsedTime(): Long = {
+      val stop = System.nanoTime()
+      return math.round((stop - start).asInstanceOf[Double] / 1000000)
+    }
+  }
 }
