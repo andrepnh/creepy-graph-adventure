@@ -7,6 +7,7 @@ import akka.actor.ActorSystem
 import akka.actor.Props
 import akka.actor.Actor
 import com.typesafe.config.ConfigFactory
+import scala.concurrent.duration._
 
 object App {
 
@@ -24,6 +25,7 @@ object App {
     val system = ActorSystem("MySystem", ConfigFactory.load(actorSystemConf))
     val coordinator = system.actorOf(Props(classOf[AssemblingCoordinator], config), name = "Coordinator")
     coordinator ! config
+    system awaitTermination(5 minutes)
   }
 
   class AssemblingCoordinator(config: Config) extends Actor {
@@ -74,6 +76,7 @@ object App {
       case edges: Array[Edge] =>
         context.parent ! edges
         if (batchesAlreadyProcessed == totalBatches) {
+          dispatch.Http.shutdown()
           context.parent ! BatchProcessingFinished()
         } else {
           context.become(receiveBatchResults(totalBatches, batchesAlreadyProcessed + 1))
