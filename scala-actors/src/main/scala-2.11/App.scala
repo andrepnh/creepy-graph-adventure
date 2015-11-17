@@ -32,12 +32,12 @@ object App {
 
     def receive = {
       case config: Config =>
-        val req = url(s"http://${config.host}/api/graph/edges-quanty")
-        val futureQuanty = Http(req OK as.String) map { _.toInt }
-        val quantyEdges = futureQuanty()
-        val batches = quantyEdges / config.batchSize + (math signum (quantyEdges % config.batchSize))
+        val req = url(s"http://${config.host}/api/graph/edges-quantity")
+        val futureQuantity = Http(req OK as.String) map { _.toInt }
+        val quantityEdges = futureQuantity()
+        val batches = quantityEdges / config.batchSize + (math signum (quantityEdges % config.batchSize))
         context.become(collectEdges(Array[Edge](), Set[Int]()))
-        context.actorOf(Props[EdgesBathProcessor], name = "EdgesBathProcessor") ! (batches, config)
+        context.actorOf(Props[EdgesBatchProcessor], name = "EdgesBatchProcessor") ! (batches, config)
     }
 
     def collectEdges(edges: Array[Edge], vertices: Set[Int]): Receive = {
@@ -54,7 +54,7 @@ object App {
 
   }
 
-  class EdgesBathProcessor extends Actor {
+  class EdgesBatchProcessor extends Actor {
     import akka.actor.OneForOneStrategy
     import akka.actor.SupervisorStrategy._
 
@@ -112,7 +112,7 @@ object App {
   case class Config(host: String, mapper: ObjectMapper, batchSize: Int)
   case class Edge(i: Int, j: Int, weight: Int)
   case class AdjacencyServerFailure(offset: Int)
-    extends Exception(s"Temporary server failure fetching adjancencies after $offset")
+    extends Exception(s"Temporary server failure fetching adjacencies after $offset")
   case class BatchProcessingFinished()
   case object Stopwatch {
     val start: Long = System.nanoTime()

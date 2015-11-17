@@ -6,3 +6,4 @@ java8/nbactions.xml
 scala-actors/.idea/
 scala-actors/target/
 scala-actors/project/
+/rx-java/target/

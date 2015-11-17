@@ -1,4 +1,4 @@
-package com.github.andrepnh.java8;
+package com.github.andrepnh.graph.clients.rxjava;
 
 public class Configuration {
 
@@ -22,8 +22,8 @@ public class Configuration {
         return graphServerHost;
     }
     
-    public String getEdgesQuantyUrl() {
-        return String.format("http://%s/api/graph/edges-quanty", graphServerHost);
+    public String getEdgesQuantityUrl() {
+        return String.format("http://%s/api/graph/edges-quantity", graphServerHost);
     }
     
     public String getGraphUrl(int offset) {

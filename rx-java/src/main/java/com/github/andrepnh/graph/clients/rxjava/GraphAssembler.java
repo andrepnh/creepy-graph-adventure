@@ -1,4 +1,4 @@
-package com.github.andrepnh.java8;
+package com.github.andrepnh.graph.clients.rxjava;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import static com.google.common.base.Preconditions.*;
@@ -70,9 +70,9 @@ public class GraphAssembler {
             }).build();
     }
     
-    private int getEdgesQuanty() {
-        HttpGet getEdgesQuanty = new HttpGet(config.getEdgesQuantyUrl());
-        try (CloseableHttpResponse response = httpClient.execute(getEdgesQuanty)) {
+    private int getEdgesQuantity() {
+        HttpGet getEdgesQuantity = new HttpGet(config.getEdgesQuantityUrl());
+        try (CloseableHttpResponse response = httpClient.execute(getEdgesQuantity)) {
             checkArgument(response.getStatusLine().getStatusCode() == 200,
                 "bad status %s",
                 response.getStatusLine().getStatusCode());
@@ -87,7 +87,7 @@ public class GraphAssembler {
         long start, end;
         start = System.nanoTime();
         Graph.Builder builder = new Graph.Builder();
-        Observable<Page> pages = Page.getPages(ioPool, httpClient, getEdgesQuanty(), config);
+        Observable<Page> pages = Page.getPages(ioPool, httpClient, getEdgesQuantity(), config);
         pages.subscribe(page -> {
             page.getEdges().forEach(builder::edge);
         });

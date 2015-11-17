@@ -1,4 +1,4 @@
-package com.github.andrepnh.java8;
+package com.github.andrepnh.graph.clients.rxjava;
 
 import static com.google.common.base.Preconditions.*;
 import com.google.common.collect.ImmutableList;

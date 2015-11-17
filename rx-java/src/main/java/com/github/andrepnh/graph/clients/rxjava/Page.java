@@ -1,4 +1,4 @@
-package com.github.andrepnh.java8;
+package com.github.andrepnh.graph.clients.rxjava;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JavaType;
@@ -26,9 +26,9 @@ public class Page {
     public static Observable<Page> getPages(
             ExecutorService ioPool, 
             CloseableHttpClient httpClient, 
-            int edgesQuanty, 
+            int edgesQuantity, 
             Configuration config) {
-        int batches = (edgesQuanty / config.getBatchSize()) + 1;
+        int batches = (edgesQuantity / config.getBatchSize()) + 1;
         return Observable.<Page>create(subscriber -> {
             IntStream.range(0, batches)
                 .parallel()

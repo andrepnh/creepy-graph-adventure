@@ -24,7 +24,7 @@ public class GraphResource {
     
     private final Random random = new Random();
 
-    @Path("/edges-quanty")
+    @Path("/edges-quantity")
     @GET
     public int getSize() {
         return App.INSTANCE.getGraph().getAdjacencies().size();
