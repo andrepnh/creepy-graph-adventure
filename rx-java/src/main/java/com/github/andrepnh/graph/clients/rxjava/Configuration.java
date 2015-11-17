@@ -2,13 +2,20 @@ package com.github.andrepnh.graph.clients.rxjava;
 
 public class Configuration {
 
-    private int batchSize;
+    private final int batchSize;
     
-    private int limit;
+    private final int limit;
     
-    private int ioThreadPoolMultiplier;
+    private final int ioThreadPoolMultiplier;
     
-    private String graphServerHost;
+    private final String graphServerHost;
+
+    public Configuration(int batchSize, int limit, int ioThreadPoolMultiplier, String graphServerHost) {
+        this.batchSize = batchSize;
+        this.limit = limit;
+        this.ioThreadPoolMultiplier = ioThreadPoolMultiplier;
+        this.graphServerHost = graphServerHost;
+    }
 
     public int getBatchSize() {
         return batchSize;
