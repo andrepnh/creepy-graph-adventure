@@ -38,7 +38,7 @@ public class Graph {
                 = new ConcurrentHashMap<>(
                         100000, 0.75F, Runtime.getRuntime().availableProcessors());
         
-        public Builder edge(Page.Edge edge) {
+        public Builder edge(Edge edge) {
             checkNotNull(edge);
             adjacencies.putIfAbsent(edge.getSource(), new ConcurrentHashMap<>());
             adjacencies.get(edge.getSource()).put(edge.getTarget(), edge.getWeight());

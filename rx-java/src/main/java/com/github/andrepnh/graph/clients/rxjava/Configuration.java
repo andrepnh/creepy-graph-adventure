@@ -1,5 +1,7 @@
 package com.github.andrepnh.graph.clients.rxjava;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class Configuration {
 
     private final int batchSize;
@@ -9,12 +11,15 @@ public class Configuration {
     private final int ioThreadPoolMultiplier;
     
     private final String graphServerHost;
+    
+    private final ObjectMapper objectMapper;
 
     public Configuration(int batchSize, int limit, int ioThreadPoolMultiplier, String graphServerHost) {
         this.batchSize = batchSize;
         this.limit = limit;
         this.ioThreadPoolMultiplier = ioThreadPoolMultiplier;
         this.graphServerHost = graphServerHost;
+        objectMapper = new ObjectMapper();
     }
 
     public int getBatchSize() {
@@ -40,5 +45,9 @@ public class Configuration {
     public int getIoThreadPoolMultiplier() {
         return ioThreadPoolMultiplier;
     }
-    
+
+    public ObjectMapper getObjectMapper() {
+        return objectMapper;
+    }
+
 }
