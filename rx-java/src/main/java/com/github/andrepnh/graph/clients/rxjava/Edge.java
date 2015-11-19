@@ -11,7 +11,6 @@ import com.ning.http.client.ListenableFuture;
 import com.ning.http.client.Response;
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.stream.IntStream;
 import rx.Observable;
 
@@ -26,10 +25,7 @@ public class Edge {
     private int weight;
 
     public static Observable<Edge> getEdges(
-        ExecutorService ioPool,
-        AsyncHttpClient httpClient,
-        Observable<Integer> edgesQuantity,
-        Configuration config) {
+        AsyncHttpClient httpClient, Observable<Integer> edgesQuantity, Configuration config) {
         
         Observable<Integer> batchAmount = edgesQuantity.single()
             .map(quantity -> (quantity / config.getBatchSize()) + 1);
@@ -49,25 +45,21 @@ public class Edge {
         ListenableFuture<List<Edge>> future = httpClient
             .prepareGet(config.getGraphUrl(index * config.getBatchSize()))
             .execute(new AsyncCompletionHandler<List<Edge>>() {
-
                 @Override
                 public List<Edge> onCompleted(Response response) throws Exception {
                     String json = response.getResponseBody("UTF-8");
                     return config.getObjectMapper()
-                    .readerFor(new TypeReference<List<Edge>>() {
-                    })
-                    .readValue(json);
+                        .readerFor(new TypeReference<List<Edge>>() {})
+                        .readValue(json);
                 }
 
                 @Override
                 public AsyncHandler.STATE onStatusReceived(HttpResponseStatus status) throws Exception {
-                    boolean retry = status.getStatusCode() == 502;
-                    if (retry) {
+                    if (status.getStatusCode() == 502) {
                         throw new IOException();
                     }
-                    return STATE.CONTINUE;
+                    return super.onStatusReceived(status); //To change body of generated methods, choose Tools | Templates.
                 }
-
             });
         return Observable.from(future)
             .flatMap(list -> Observable.from(list));
