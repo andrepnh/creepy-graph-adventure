@@ -4,12 +4,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableList;
 import com.ning.http.client.AsyncCompletionHandler;
-import com.ning.http.client.AsyncHandler;
 import com.ning.http.client.AsyncHttpClient;
-import com.ning.http.client.HttpResponseStatus;
 import com.ning.http.client.ListenableFuture;
 import com.ning.http.client.Response;
-import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.IntStream;
 import rx.Observable;
@@ -47,22 +45,42 @@ public class Edge {
             .execute(new AsyncCompletionHandler<List<Edge>>() {
                 @Override
                 public List<Edge> onCompleted(Response response) throws Exception {
+                    if (response.getStatusCode() == 502) {
+                        return Collections.emptyList();
+                    }
                     String json = response.getResponseBody("UTF-8");
                     return config.getObjectMapper()
                         .readerFor(new TypeReference<List<Edge>>() {})
                         .readValue(json);
                 }
-
+            });
+        return Observable.from(future)
+            .switchMap(list -> list.isEmpty()
+                ? fetchSingleEdgesBatchHelper(index, config, httpClient) 
+                : Observable.from(Collections.singletonList(list)))
+            .flatMap(list -> Observable.from(list));
+    }
+    
+    private static Observable<List<Edge>> fetchSingleEdgesBatchHelper(
+        int index, Configuration config, AsyncHttpClient httpClient) {
+        ListenableFuture<List<Edge>> future = httpClient
+            .prepareGet(config.getGraphUrl(index * config.getBatchSize()))
+            .execute(new AsyncCompletionHandler<List<Edge>>() {
                 @Override
-                public AsyncHandler.STATE onStatusReceived(HttpResponseStatus status) throws Exception {
-                    if (status.getStatusCode() == 502) {
-                        throw new IOException();
+                public List<Edge> onCompleted(Response response) throws Exception {
+                    if (response.getStatusCode() == 502) {
+                        return Collections.emptyList();
                     }
-                    return super.onStatusReceived(status); //To change body of generated methods, choose Tools | Templates.
+                    String json = response.getResponseBody("UTF-8");
+                    return config.getObjectMapper()
+                        .readerFor(new TypeReference<List<Edge>>() {})
+                        .readValue(json);
                 }
             });
         return Observable.from(future)
-            .flatMap(list -> Observable.from(list));
+            .switchMap(list -> list.isEmpty()
+                ? fetchSingleEdgesBatchHelper(index, config, httpClient) 
+                : Observable.from(Collections.singletonList(list)));
     }
 
     public int getSource() {

@@ -22,7 +22,6 @@ public class GraphAssembler {
         int ioThreads = Runtime.getRuntime().availableProcessors() * config.getIoThreadPoolMultiplier();
         this.httpClient = new AsyncHttpClient(new AsyncHttpClientConfig.Builder()
             .setExecutorService(Executors.newFixedThreadPool(ioThreads))
-            .setMaxRequestRetry(Integer.MAX_VALUE)
             .build());
     }
 
@@ -63,5 +62,4 @@ public class GraphAssembler {
     private void shutdown() {
         httpClient.close();
     }
-
 }
