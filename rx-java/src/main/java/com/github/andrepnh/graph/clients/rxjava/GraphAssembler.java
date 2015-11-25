@@ -19,9 +19,7 @@ public class GraphAssembler {
 
     public GraphAssembler(Configuration config) {
         this.config = checkNotNull(config);
-        int ioThreads = Runtime.getRuntime().availableProcessors() * config.getIoThreadPoolMultiplier();
         this.httpClient = new AsyncHttpClient(new AsyncHttpClientConfig.Builder()
-            .setExecutorService(Executors.newFixedThreadPool(ioThreads))
             .build());
     }
 
