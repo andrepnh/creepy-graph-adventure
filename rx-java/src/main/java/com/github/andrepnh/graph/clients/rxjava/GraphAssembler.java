@@ -8,6 +8,8 @@ import com.ning.http.client.Response;
 import java.io.IOException;
 import java.util.concurrent.Executors;
 import rx.Observable;
+import rx.Scheduler;
+import rx.schedulers.Schedulers;
 
 public class GraphAssembler {
 
@@ -25,10 +27,24 @@ public class GraphAssembler {
 
     public static void main(String[] args) throws IOException, InterruptedException {
         assembler = new GraphAssembler(new Configuration(1000, 1000, 8, "localhost:8080"));
-        Runtime.getRuntime().addShutdownHook(new Thread(assembler::shutdown));
-        assembler.run();
+        try (AsyncHttpClient client = assembler.httpClient) {
+            assembler.assemble();
+        }
     }
-
+    
+    private void assemble() throws InterruptedException {
+        long start, end;
+        start = System.nanoTime();
+        Graph.Builder builder = new Graph.Builder();
+        Observable<Edge> edges = getEdges(httpClient, getEdgesQuantity(), config);
+        edges.toBlocking().forEach(builder::edge);
+        Graph graph = builder.build();
+        end = System.nanoTime();
+        System.out.println("Vertices: " + graph.getVertices());
+        System.out.println("Edges: " + graph.getAdjacencies().size());
+        System.out.println("Milliseconds taken: " + Math.round(((double) (end - start)) / 1000000));
+    }
+    
     private Observable<Integer> getEdgesQuantity() {
         return Observable
             .from(httpClient.prepareGet(config.getEdgesQuantityUrl())
@@ -39,25 +55,25 @@ public class GraphAssembler {
                     }
                 }));
     }
-
-    private void run() throws InterruptedException {
-        try {
-            long start, end;
-            start = System.nanoTime();
-            Graph.Builder builder = new Graph.Builder();
-            Observable<Edge> edges = Edge.getEdges(httpClient, getEdgesQuantity(), config);
-            edges.toBlocking().forEach(builder::edge);
-            Graph graph = builder.build();
-            end = System.nanoTime();
-            System.out.println("Vertices: " + graph.getVertices());
-            System.out.println("Edges: " + graph.getAdjacencies().size());
-            System.out.println("Milliseconds taken: " + Math.round(((double) (end - start)) / 1000000));
-        } finally {
-            shutdown();
-        }
+    
+    private Observable<Edge> getEdges(
+        AsyncHttpClient httpClient, Observable<Integer> edgesQuantity, Configuration config) {
+        
+        int ioThreads = config.getIoThreadPoolMultiplier() * Runtime.getRuntime().availableProcessors();
+        final Scheduler scheduler = Schedulers.from(Executors.newFixedThreadPool(ioThreads, 
+            runnable -> {
+                Thread thread = new Thread(runnable);
+                thread.setDaemon(true);
+                return thread;
+            }));
+        
+        return edgesQuantity.single()
+            .map(quantity -> {
+                int div = quantity / config.getBatchSize(), mod = quantity % config.getBatchSize();
+                int batches = div + ((mod > 0) ? 1 : 0);
+                return batches;
+            }).flatMap(batches -> Observable.range(0, batches))
+            .flatMap(batch -> Edge.getEdgesBatch(batch, config, httpClient, scheduler));
     }
 
-    private void shutdown() {
-        httpClient.close();
-    }
 }

@@ -8,10 +8,8 @@ import com.ning.http.client.ListenableFuture;
 import com.ning.http.client.Response;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.Executors;
 import rx.Observable;
 import rx.Scheduler;
-import rx.schedulers.Schedulers;
 
 public class Edge {
     
@@ -23,30 +21,13 @@ public class Edge {
 
     private int weight;
 
-    public static Observable<Edge> getEdges(
-        AsyncHttpClient httpClient, Observable<Integer> edgesQuantity, Configuration config) {
-        final Scheduler scheduler = Schedulers.from(Executors.newFixedThreadPool(config.getIoThreadPoolMultiplier() * Runtime.getRuntime().availableProcessors(), 
-            runnable -> {
-                Thread thread = new Thread(runnable);
-                thread.setDaemon(true);
-                return thread;
-            }));
-        return edgesQuantity.single()
-            .map(quantity -> {
-                int div = quantity / config.getBatchSize(), mod = quantity % config.getBatchSize();
-                int batches = div + ((mod > 0) ? 1 : 0);
-                return batches;
-            }).flatMap(batches -> Observable.range(0, batches))
-            .flatMap(batch -> fetchSingleEdgesBatch(batch, config, httpClient, scheduler));
-    }
-
-    private static Observable<Edge> fetchSingleEdgesBatch(
+    public static Observable<Edge> getEdgesBatch(
         int index, Configuration config, AsyncHttpClient httpClient, Scheduler scheduler) {
-        return fetchSingleEdgesBatchHelper(index, config, httpClient, scheduler)
+        return fireEdgesRequest(index, config, httpClient, scheduler)
             .flatMap(list -> Observable.from(list));
     }
     
-    private static Observable<List<Edge>> fetchSingleEdgesBatchHelper(
+    private static Observable<List<Edge>> fireEdgesRequest(
         int index, Configuration config, AsyncHttpClient httpClient, Scheduler scheduler) {
         ListenableFuture<List<Edge>> future = httpClient
             .prepareGet(config.getGraphUrl(index * config.getBatchSize()))
@@ -62,11 +43,12 @@ public class Edge {
                         .readValue(json);
                 }
             });
+        // Hacking request retry with rx
         return Observable.from(future)
             .subscribeOn(scheduler)
-            .switchMap(list -> list.isEmpty()
-                ? fetchSingleEdgesBatchHelper(index, config, httpClient, scheduler) 
-                : Observable.from(Collections.singletonList(list)));
+            .flatMap(list -> (list.isEmpty())
+                ? fireEdgesRequest(index, config, httpClient, scheduler) 
+                : Observable.just(list));
     }
 
     public int getSource() {
