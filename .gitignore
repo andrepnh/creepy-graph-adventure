@@ -7,3 +7,9 @@ scala-actors/.idea/
 scala-actors/target/
 scala-actors/project/
 /rx-java/target/
+clojure-agents/target/
+clojure-agents/.nrepl-port
+clojure-agents/.project
+clojure-agents/.settings/ccw.repl.cmdhistory.prefs
+clojure-agents/.classpath
+clojure-agents/bin/
