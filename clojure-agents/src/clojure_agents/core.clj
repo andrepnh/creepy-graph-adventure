@@ -2,19 +2,24 @@
    (:require [clj-http.client :as http-client])
    (:require [clojure.data.json :as json]))
 
+(def start (System/nanoTime))
 (def graph (agent {}))
 (def graph-builder (agent {:edges-assembled 0 :data {}}))
 (def edges-amount (agent 0))
 
 (defn- build-graph [_ builder]
-  (let [flattened-map 
-        (map (fn [entry] (flatten (cons [(entry 0)] (entry 1)))) (builder :data))]
-    (assoc {} :adjacencies flattened-map :vertices (count (builder :data)))))
+  (let [flattened-adjacencies 
+        (apply concat 
+               (for [entry (builder :data)] 
+                 (for [target-weight (entry 1)] 
+                   (cons (entry 0) target-weight))))]
+    (assoc {} :adjacencies flattened-adjacencies :vertices (count (builder :data)))))
 
 (defn- on-graph-built [key ref old graph] 
   (do 
     (prn (format "Vertices: %d" (graph :vertices)))
-    (prn (format "Edges: %d" (count (graph :adjacencies))))))
+    (prn (format "Edges: %d" (count (graph :adjacencies))))
+    (prn (format "Milliseconds taken: %d" (Math/round (double (/ (- (System/nanoTime) start) 1000000)))))))
 
 (defn- put-on-builder
   [builder partial-edges]
@@ -22,7 +27,7 @@
         (reduce #(assoc-in %1 [(:i %2) (:j %2)] (:weight %2)) {} partial-edges)]
     (assoc builder 
            :edges-assembled (+ (builder :edges-assembled) (count partial-edges))
-           :data ((merge-with merge (builder :data) partial-map)))))
+           :data (merge-with merge (builder :data) partial-map))))
 
 (defn- on-builder-updated [key ref old builder] 
   (if (= @edges-amount (:edges-assembled builder))
