@@ -27,9 +27,7 @@ public class App extends Application<AppConfig> {
         int vertices = Integer.parseInt(System.getProperty("vertices", String.valueOf(DEFAULT_VERTICES))),
             fillRate = Integer.parseInt(System.getProperty("fillRate", String.valueOf(DEFAULT_FILL_RATE)));
         LOG.info("Building graph with {} vertices and fill rate of {}", vertices, fillRate);
-        graph = Graph.random(
-            Integer.parseInt(System.getProperty("vertices", String.valueOf(DEFAULT_VERTICES))), 
-            Integer.parseInt(System.getProperty("fillRate", String.valueOf(DEFAULT_FILL_RATE))));
+        graph = Graph.random(vertices, fillRate);
         LOG.info("Graph successfully built. Total nodes: {}; total edges: {}",
             graph.getVertices(), graph.getAdjacencies().size());
     }

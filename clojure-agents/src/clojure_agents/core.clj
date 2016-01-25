@@ -55,6 +55,10 @@
     (let [edges (agent [])]
       (do
         (add-watch edges :edges-watcher on-edges-received)
+        (set-error-mode! edges :continue)
+        (set-error-handler! 
+          edges
+          (fn [agent _] (send-off agent get-edges offset 1000)))
         (send-off edges get-edges offset 1000)))))
 
 (defn- edges-amount-watcher
