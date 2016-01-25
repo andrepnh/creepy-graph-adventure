@@ -22,11 +22,11 @@
     (prn (format "Milliseconds taken: %d" (Math/round (double (/ (- (System/nanoTime) start) 1000000)))))))
 
 (defn- put-on-builder
-  [builder partial-edges]
+  [builder edges-range]
   (let [partial-map 
-        (reduce #(assoc-in %1 [(:i %2) (:j %2)] (:weight %2)) {} partial-edges)]
+        (reduce #(assoc-in %1 [(:i %2) (:j %2)] (:weight %2)) {} edges-range)]
     (assoc builder 
-           :edges-assembled (+ (builder :edges-assembled) (count partial-edges))
+           :edges-assembled (+ (builder :edges-assembled) (count edges-range))
            :data (merge-with merge (builder :data) partial-map))))
 
 (defn- on-builder-updated [key ref old builder] 
@@ -34,41 +34,34 @@
     (send graph build-graph builder)))
 
 
-(defn- get-edges
+(defn- get-edges-range
   [_ offset limit]
   (json/read-str 
     (:body (http-client/get (format "http://localhost:8080/api/graph?offset=%d&limit=%d" 
                                     offset limit)))
     :key-fn keyword))
 
-(defn- assemble-graph
-  [assembled partial-edges]
-  (merge-with merge assembled partial-edges))
-
-(defn- on-edges-received
-  [key ref old edges]
-  (send graph-builder put-on-builder edges))
-
-(defn- get-graph
-  [offsets]
-  (doseq [offset offsets]
-    (let [edges (agent [])]
-      (do
-        (add-watch edges :edges-watcher on-edges-received)
-        (set-error-mode! edges :continue)
-        (set-error-handler! 
-          edges
-          (fn [agent _] (send-off agent get-edges offset 1000)))
-        (send-off edges get-edges offset 1000)))))
+(defn- on-edges-range-received
+  [key ref old edges-range]
+  (send graph-builder put-on-builder edges-range))
 
 (defn- edges-amount-watcher
   [key ref old edges-amount]
-  (def offsets 
-    (map #(* 1000 %) 
-         (let [batches-amount 
-               (+ (quot edges-amount 1000) (Integer/signum (mod edges-amount 1000)))] 
-           (range batches-amount))))
-  (get-graph offsets))
+  (let [offsets 
+        (map 
+          #(* 1000 %) 
+          (let [batches-amount 
+                (+ (quot edges-amount 1000) (Integer/signum (mod edges-amount 1000)))] 
+            (range batches-amount)))]
+    (doseq [offset offsets]
+    (let [edges-range (agent [])]
+      (do
+        (add-watch edges-range :edges-range-watcher on-edges-range-received)
+        (set-error-mode! edges-range :continue)
+        (set-error-handler! 
+          edges-range
+          (fn [agent _] (send-off agent get-edges-range offset 1000)))
+        (send-off edges-range get-edges-range offset 1000))))))
 
 (defn main
   []
