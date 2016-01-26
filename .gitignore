@@ -13,3 +13,4 @@ clojure-agents/.project
 clojure-agents/.settings/ccw.repl.cmdhistory.prefs
 clojure-agents/.classpath
 clojure-agents/bin/
+*.exe
