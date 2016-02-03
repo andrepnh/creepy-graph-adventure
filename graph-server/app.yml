@@ -3,5 +3,3 @@ server:
   rootPath: /api/*
   requestLog:
     appenders: []
-  minThreads: 32
-  maxThreads: 32
