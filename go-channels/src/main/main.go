@@ -47,26 +47,32 @@ func fetchEdgesAmount(client *gorequest.SuperAgent) int {
 
 func fetchEdges(offset int, limit int, channel chan<- []Edge, client *gorequest.SuperAgent) {
 	var edges []Edge
-	time.Sleep(2 * time.Second)
-	resp, err := http.Get(fmt.Sprintf(
+	done, url := false, fmt.Sprintf(
 		"http://localhost:8080/api/graph?offset=%d&limit=%d",
-		offset, limit))
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(0)
+		offset, limit)
+	for resp, err := http.Get(url); !done; resp, err = http.Get(url) {
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(0)
+		}
+		done = func() bool {
+			defer resp.Body.Close()
+			if resp.StatusCode == 200 {
+				body, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					fmt.Println(err.Error())
+					os.Exit(0)
+				}
+				err = json.Unmarshal(body, &edges)
+				if err != nil {
+					fmt.Println(err.Error())
+					os.Exit(0)
+				}
+				channel <- edges
+			}
+			return resp.StatusCode == 200
+		}()
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(0)
-	}
-	err = json.Unmarshal(body, &edges)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(0)
-	}
-	channel <- edges
 }
 
 func main() {
