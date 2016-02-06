@@ -9,8 +9,6 @@ import (
 	"runtime"
 	"strconv"
 	"time"
-
-	"github.com/parnurzeal/gorequest"
 )
 
 type Edge struct {
@@ -25,11 +23,10 @@ type graph struct {
 }
 
 type builder struct {
-	data        map[int]map[int]int
-	edgesAmount int
+	data map[int]map[int]int
 }
 
-func buildGraph(builder builder) graph {
+func (builder builder) build() graph {
 	graph := graph{[]Edge{}, len(builder.data)}
 	for source, neighbors := range builder.data {
 		for target, weight := range neighbors {
@@ -39,13 +36,41 @@ func buildGraph(builder builder) graph {
 	return graph
 }
 
-func fetchEdgesAmount(client *gorequest.SuperAgent) int {
-	_, body, _ := client.Get("http://localhost:8080/api/graph/edges-quantity").End()
-	edgesAmount, _ := strconv.ParseInt(body, 10, 32)
+func assembleGraph() graph {
+	edgesAmount, limit := fetchEdgesAmount(), 1000
+	batches := edgesAmount / limit
+	if edgesAmount%limit > 0 {
+		batches++
+	}
+	edgesRange := make(chan []Edge, runtime.NumCPU()*8)
+	for i := 0; i < batches; i++ {
+		go fetchEdges(i*limit, limit, edgesRange)
+	}
+	builder := builder{map[int]map[int]int{}}
+	for i := 0; i < batches; i++ {
+		edges := <-edgesRange
+		for _, edge := range edges {
+			neighbors, contains := builder.data[edge.I]
+			if !contains {
+				builder.data[edge.I] = map[int]int{}
+				neighbors = builder.data[edge.I]
+			}
+			neighbors[edge.J] = edge.Weight
+		}
+	}
+
+	return builder.build()
+}
+
+func fetchEdgesAmount() int {
+	resp, _ := http.Get("http://localhost:8080/api/graph/edges-quantity")
+	defer resp.Body.Close()
+	content, _ := ioutil.ReadAll(resp.Body)
+	edgesAmount, _ := strconv.ParseInt(string(content), 10, 32)
 	return int(edgesAmount)
 }
 
-func fetchEdges(offset int, limit int, channel chan<- []Edge, client *gorequest.SuperAgent) {
+func fetchEdges(offset int, limit int, channel chan<- []Edge) {
 	var edges []Edge
 	done, url := false, fmt.Sprintf(
 		"http://localhost:8080/api/graph?offset=%d&limit=%d",
@@ -77,31 +102,8 @@ func fetchEdges(offset int, limit int, channel chan<- []Edge, client *gorequest.
 
 func main() {
 	begin := time.Now()
-	httpClient := gorequest.New()
 
-	edgesAmount, limit := fetchEdgesAmount(httpClient), 1000
-	batches := edgesAmount / limit
-	if edgesAmount%limit > 0 {
-		batches++
-	}
-	edgesRange := make(chan []Edge, runtime.NumCPU()*8)
-	for i := 0; i < batches; i++ {
-		go fetchEdges(i*limit, limit, edgesRange, httpClient)
-	}
-	builder := builder{map[int]map[int]int{}, 0}
-	for i := 0; i < batches; i++ {
-		edges := <-edgesRange
-		for _, edge := range edges {
-			neighbors, contains := builder.data[edge.I]
-			if !contains {
-				builder.data[edge.I] = map[int]int{}
-				neighbors = builder.data[edge.I]
-			}
-			neighbors[edge.J] = edge.Weight
-		}
-	}
-
-	graph := buildGraph(builder)
+	graph := assembleGraph()
 	fmt.Println("Vertices:", graph.vertices)
 	fmt.Println("Edges:", len(graph.edges))
 	fmt.Println("Milliseconds taken:", int(time.Since(begin).Nanoseconds()/1000000))
