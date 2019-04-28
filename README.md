@@ -1,4 +1,4 @@
-An exercise I've used over the years to a quick hands on experience with the different approaches used by different languages for concurrency, parallelism and data transformation. For that I'm using a simple, well-defined problem: a server holds a graph and provides an API to fetch it. Each client application must assemble the graph on it's side and output basic data about it.
+An exercise I've used over the years for a quick hands-on experience with the different approaches used by different languages for concurrency, parallelism and data transformation. For that I'm using a simple, well-defined problem: a server holds a graph and provides an API to fetch it. Each client application must assemble the graph on it's side and output basic data about it.
 
 The thing is that that graph is a big one, you can't fetch it all at once. What the server does is to expose it's adjacency matrix as a paged list of 3-tuple as in `i, j, K`. `i` and `j` are vertices and `K` is the weight of the edge connecting those nodes. Also, the graph server is scaling bad; requests fail frequently.
 
